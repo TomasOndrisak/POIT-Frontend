@@ -75,6 +75,12 @@
             box-shadow: 0 0 0 0.25rem rgba(14, 165, 233, 0.25);
         }
 
+        .form-control:disabled {
+            background-color: #1e293b;
+            color: #64748b;
+            opacity: 0.8;
+        }
+
         .temp-display {
             display: flex;
             align-items: baseline;
@@ -153,6 +159,18 @@
             background-color: #0284c7;
             color: #fff;
         }
+
+        .form-switch .form-check-input {
+            width: 2.5em;
+            height: 1.25em;
+            cursor: pointer;
+        }
+
+        .form-check-label {
+            cursor: pointer;
+            padding-top: 2px;
+            padding-left: 8px;
+        }
     </style>
 </head>
 
@@ -210,7 +228,15 @@
 
             <div class="col-lg-6">
                 <div class="card p-3">
-                    <h6 class="form-label text-white mb-3">Manuálne Riadenie</h6>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="form-label text-white mb-0">Riadenie Systému</h6>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="autoModeSwitch" checked
+                                onchange="toggleAutoMode(this.checked)">
+                            <label class="form-check-label fw-bold text-info" id="autoLabel" for="autoModeSwitch">AUTO
+                                REŽIM (PID)</label>
+                        </div>
+                    </div>
 
                     <label class="form-label">Žiadaná Teplota (°C)</label>
                     <div class="d-flex align-items-center mb-3">
@@ -228,45 +254,55 @@
                             max="100" value="25" oninput="syncInputs('P', this.value)">
                     </div>
 
-                    <label class="form-label">Výkon Ohrevu (%)</label>
-                    <div class="d-flex align-items-center mb-3">
-                        <input type="range" class="form-range flex-grow-1 me-3" id="rangeHeater" min="0" max="100"
-                            value="50" oninput="syncInputs('H', this.value)">
-                        <input type="number" class="form-control form-control-sm w-25 text-center" id="numHeater"
-                            min="0" max="100" value="50" oninput="syncInputs('H', this.value)">
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label text-danger">Výkon Ohrevu (%)</label>
+                            <div class="d-flex align-items-center mb-3">
+                                <input type="range" class="form-range flex-grow-1 me-2" id="rangeHeater" min="0"
+                                    max="100" value="0" disabled oninput="syncInputs('H', this.value)">
+                                <input type="number" class="form-control form-control-sm text-center"
+                                    style="width: 50px;" id="numHeater" min="0" max="100" value="0" disabled
+                                    oninput="syncInputs('H', this.value)">
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-info">Chladenie (Peltier) (%)</label>
+                            <div class="d-flex align-items-center mb-3">
+                                <input type="range" class="form-range flex-grow-1 me-2" id="rangeCooler" min="0"
+                                    max="100" value="0" disabled oninput="syncInputs('C', this.value)">
+                                <input type="number" class="form-control form-control-sm text-center"
+                                    style="width: 50px;" id="numCooler" min="0" max="100" value="0" disabled
+                                    oninput="syncInputs('C', this.value)">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="d-flex gap-2">
                         <button class="btn btn-primary-custom flex-grow-1" onclick="sendControls()">Odoslať
                             nastavenia</button>
-                        <button class="btn btn-danger fw-bold" style="min-width: 90px;" onclick="sendStop()">
-                            STOP</button>
+                        <button class="btn btn-danger fw-bold" style="min-width: 90px;"
+                            onclick="sendStop()">STOP</button>
                     </div>
                 </div>
             </div>
 
             <div class="col-lg-3">
                 <div class="card p-3">
-                    <h6 class="form-label text-white mb-3">PID Ladenie (Peltier)</h6>
+                    <h6 class="form-label text-white mb-3">PI Ladenie</h6>
                     <div class="row g-2 mb-3">
-                        <div class="col-4">
+                        <div class="col-6">
                             <label class="form-label">Kp (Prop)</label>
                             <input type="number" id="inpKp" class="form-control text-center" step="0.1" value="2.0">
                         </div>
-                        <div class="col-4">
+                        <div class="col-6">
                             <label class="form-label">Ki (Integ)</label>
                             <input type="number" id="inpKi" class="form-control text-center" step="0.1" value="5.0">
                         </div>
-                        <div class="col-4">
-                            <label class="form-label">Kd (Deriv)</label>
-                            <input type="number" id="inpKd" class="form-control text-center" step="0.1" value="1.0">
-                        </div>
                     </div>
-                    <button class="btn btn-primary-custom w-100" onclick="sendPID()">Odoslať PID Parametre</button>
                 </div>
+                <button class="btn btn-primary-custom w-100" onclick="sendPID()">Odoslať PID Parametre</button>
             </div>
         </div>
-
         <div class="row">
             <div class="col-12">
                 <div class="form-label mb-2">Systémový Log Príkazov</div>
@@ -274,7 +310,6 @@
             </div>
         </div>
     </div>
-
     <script>
         setInterval(() => {
             document.getElementById('current-time').innerText = new Date().toLocaleTimeString('sk-SK');
@@ -282,6 +317,7 @@
 
         const socket = io();
         const MAX_SAMPLES = 60;
+        let isAuto = true;
 
         Chart.defaults.color = '#94a3b8';
         Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
@@ -304,10 +340,9 @@
             type: 'line',
             data: {
                 labels: [], datasets: [
-                    { label: 'Výstup (0-255)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.1, fill: true, pointRadius: 0, borderWidth: 2 },
+                    { label: 'Akčný zásah (0-255)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.1, fill: true, pointRadius: 0, borderWidth: 2 },
                     { label: 'P-Zložka', data: [], borderColor: '#f59e0b', borderWidth: 1, pointRadius: 0 },
-                    { label: 'I-Zložka', data: [], borderColor: '#8b5cf6', borderWidth: 1, pointRadius: 0 },
-                    { label: 'D-Zložka', data: [], borderColor: '#ec4899', borderWidth: 1, pointRadius: 0 }
+                    { label: 'I-Zložka', data: [], borderColor: '#8b5cf6', borderWidth: 1, pointRadius: 0 }
                 ]
             },
             options: { responsive: true, animation: false, interaction: { mode: 'index', intersect: false }, scales: { y: { suggestedMin: -50, suggestedMax: 260 } } }
@@ -328,9 +363,9 @@
         });
 
         socket.on('serial_data', (data) => {
-            document.getElementById('val-voda').innerHTML = `${data.Voda.toFixed(1)}<span class="unit">°C</span>`;
-            document.getElementById('val-ciel').innerHTML = `${data.Ciel.toFixed(1)}<span class="unit">°C</span>`;
-            document.getElementById('val-okolie').innerHTML = `${data.Okolie.toFixed(1)}<span class="unit">°C</span>`;
+            document.getElementById('val-voda').innerHTML = `${(data.Voda || 0).toFixed(1)}<span class="unit">°C</span>`;
+            document.getElementById('val-ciel').innerHTML = `${(data.Ciel || 0).toFixed(1)}<span class="unit">°C</span>`;
+            document.getElementById('val-okolie').innerHTML = `${(data.Okolie || 0).toFixed(1)}<span class="unit">°C</span>`;
 
             const now = new Date().toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -338,16 +373,14 @@
             tempChart.data.datasets[0].data.push(data.Voda);
             tempChart.data.datasets[1].data.push(data.Ciel);
 
-            const pTerm = data.PTerm;
-            const output = data.PID_PWM;
-            const iTerm = output - pTerm;
-            const dTerm = 0;
+            const pTerm = data.PTerm || 0;
+            const activeOutput = Math.max((data.Ohrev || 0), (data.Peltier || 0));
+            const iTerm = (data.Auto === 1) ? (data.PID_PWM - pTerm) : 0;
 
             pwmChart.data.labels.push(now);
-            pwmChart.data.datasets[0].data.push(output);
+            pwmChart.data.datasets[0].data.push(activeOutput);
             pwmChart.data.datasets[1].data.push(pTerm);
             pwmChart.data.datasets[2].data.push(iTerm);
-            pwmChart.data.datasets[3].data.push(dTerm);
 
             if (tempChart.data.labels.length > MAX_SAMPLES) {
                 tempChart.data.labels.shift();
@@ -359,17 +392,28 @@
             tempChart.update();
             pwmChart.update();
 
+            if (data.Auto === 1) {
+                let hPct = Math.round(((data.Ohrev || 0) / 255) * 100);
+                let cPct = Math.round(((data.Peltier || 0) / 255) * 100);
+
+                document.getElementById('rangeHeater').value = hPct;
+                document.getElementById('numHeater').value = hPct;
+                document.getElementById('rangeCooler').value = cPct;
+                document.getElementById('numCooler').value = cPct;
+            }
+
             const modeBadge = document.getElementById('mode-badge');
-            const mod = parseFloat(data.Mod);
-            if (mod === 1) {
-                modeBadge.className = 'badge bg-danger';
-                modeBadge.innerText = 'OHREV';
-            } else if (mod === 0) {
-                modeBadge.className = 'badge bg-info text-dark';
-                modeBadge.innerText = 'CHLADENIE';
+            if (data.Auto === 1) {
+                if (data.Mod === 1) {
+                    modeBadge.className = 'badge bg-danger';
+                    modeBadge.innerText = 'AUTO: OHREV';
+                } else {
+                    modeBadge.className = 'badge bg-info text-dark';
+                    modeBadge.innerText = 'AUTO: CHLADENIE';
+                }
             } else {
-                modeBadge.className = 'badge bg-secondary';
-                modeBadge.innerText = `Režim: ${mod}`;
+                modeBadge.className = 'badge bg-warning text-dark';
+                modeBadge.innerText = 'MANUÁLNY REŽIM';
             }
         });
 
@@ -379,16 +423,33 @@
             const entry = document.createElement('div');
             entry.className = 'log-entry';
             entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
-
             logBox.appendChild(entry);
-
             if (logBox.children.length > 50) logBox.firstChild.remove();
             logBox.scrollTop = logBox.scrollHeight;
         }
 
+        function toggleAutoMode(state) {
+            isAuto = state;
+            socket.emit('update_setting', { type: 'A', value: isAuto ? 1 : 0 });
+
+            const label = document.getElementById('autoLabel');
+            label.innerText = isAuto ? 'AUTO REŽIM (PID)' : 'MANUÁLNY REŽIM';
+            label.className = isAuto ? 'form-check-label fw-bold text-info' : 'form-check-label fw-bold text-warning';
+
+            document.getElementById('rangeHeater').disabled = isAuto;
+            document.getElementById('numHeater').disabled = isAuto;
+            document.getElementById('rangeCooler').disabled = isAuto;
+            document.getElementById('numCooler').disabled = isAuto;
+
+            document.getElementById('rangeSetpoint').disabled = !isAuto;
+            document.getElementById('numSetpoint').disabled = !isAuto;
+
+            addLog(`>> SYSTÉM PREPNUTÝ DO: ${isAuto ? 'AUTOMATU' : 'MANUÁLU'}`);
+        }
+
         function syncInputs(type, val) {
-            let rangeId = type === 'S' ? 'rangeSetpoint' : (type === 'P' ? 'rangePump' : 'rangeHeater');
-            let numId = type === 'S' ? 'numSetpoint' : (type === 'P' ? 'numPump' : 'numHeater');
+            let rangeId = type === 'S' ? 'rangeSetpoint' : (type === 'P' ? 'rangePump' : (type === 'H' ? 'rangeHeater' : 'rangeCooler'));
+            let numId = type === 'S' ? 'numSetpoint' : (type === 'P' ? 'numPump' : (type === 'H' ? 'numHeater' : 'numCooler'));
             document.getElementById(rangeId).value = val;
             document.getElementById(numId).value = val;
         }
@@ -397,29 +458,43 @@
             const s = document.getElementById('numSetpoint').value;
             const pPct = parseFloat(document.getElementById('numPump').value);
             const hPct = parseFloat(document.getElementById('numHeater').value);
+            const cPct = parseFloat(document.getElementById('numCooler').value);
+
             const p = Math.round(pPct * 2.55);
             const h = Math.round(hPct * 2.55);
-            socket.emit('update_setting', { type: 'S', value: s });
-            socket.emit('update_setting', { type: 'P', value: p });
-            socket.emit('update_setting', { type: 'H', value: h });
-            addLog(`>> Nastavené: Setpoint=${s}°C, Čerpadlo=${pPct}% (${p}/255), Ohrev=${hPct}% (${h}/255)`);
+            const c = Math.round(cPct * 2.55);
+
+            if (isAuto) {
+                socket.emit('update_setting', { type: 'S', value: s });
+                socket.emit('update_setting', { type: 'P', value: p });
+                addLog(`>> [AUTO] Nastavené: Cieľ=${s}°C, Čerpadlo=${pPct}%`);
+            } else {
+                socket.emit('update_setting', { type: 'P', value: p });
+                socket.emit('update_setting', { type: 'H', value: h });
+                socket.emit('update_setting', { type: 'C', value: c });
+                addLog(`>> [MANUÁL] Nastavené: Čerpadlo=${pPct}%, Ohrev=${hPct}%, Chladenie=${cPct}%`);
+            }
         }
 
         function sendStop() {
+            document.getElementById('autoModeSwitch').checked = false;
+            toggleAutoMode(false);
+
             socket.emit('update_setting', { type: 'P', value: 0 });
             socket.emit('update_setting', { type: 'H', value: 0 });
-            ['rangePump', 'numPump', 'rangeHeater', 'numHeater'].forEach(id =>
-                document.getElementById(id).value = 0
-            );
-            addLog('>> STOP: Čerpadlo=0, Ohrev=0 (všetky PWM vypnuté)');
+            socket.emit('update_setting', { type: 'C', value: 0 });
+
+            ['rangePump', 'numPump', 'rangeHeater', 'numHeater', 'rangeCooler', 'numCooler'].forEach(id => document.getElementById(id).value = 0);
+
+            addLog('>> BEZPEČNOSTNÝ STOP: Všetky akčné členy boli odpojené (0%)!');
         }
 
         function sendPID() {
             const p = document.getElementById('inpKp').value;
             const i = document.getElementById('inpKi').value;
-            const d = document.getElementById('inpKd').value;
-            socket.emit('update_pid', { p: p, i: i, d: d });
-            addLog(`>> Aktualizácia PID: Kp=${p}, Ki=${i}, Kd=${d}`);
+
+            socket.emit('update_pid', { p: p, i: i, d: 0 });
+            addLog(`>> Aktualizácia PI: Kp=${p}, Ki=${i}`);
         }
     </script>
 </body>
