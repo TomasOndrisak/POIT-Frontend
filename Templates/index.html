@@ -196,7 +196,7 @@
             </div>
             <div class="col-lg-6">
                 <div class="card p-3">
-                    <h6 class="form-label mb-3">Analýza Akčného zásahu a PID Súčastí</h6>
+                    <h6 class="form-label mb-3">Analýza Akčného zásahu a PI Súčastí</h6>
                     <canvas id="pwmChart" style="min-height: 260px;"></canvas>
                 </div>
             </div>
@@ -234,7 +234,7 @@
                             <input class="form-check-input" type="checkbox" id="autoModeSwitch" checked
                                 onchange="toggleAutoMode(this.checked)">
                             <label class="form-check-label fw-bold text-info" id="autoLabel" for="autoModeSwitch">AUTO
-                                REŽIM (PID)</label>
+                                REŽIM (PI)</label>
                         </div>
                     </div>
 
@@ -300,7 +300,7 @@
                         </div>
                     </div>
                 </div>
-                <button class="btn btn-primary-custom w-100" onclick="sendPID()">Odoslať PID Parametre</button>
+                <button class="btn btn-primary-custom w-100" onclick="sendPI()">Odoslať PI Parametre</button>
             </div>
         </div>
         <div class="row">
@@ -433,7 +433,7 @@
             socket.emit('update_setting', { type: 'A', value: isAuto ? 1 : 0 });
 
             const label = document.getElementById('autoLabel');
-            label.innerText = isAuto ? 'AUTO REŽIM (PID)' : 'MANUÁLNY REŽIM';
+            label.innerText = isAuto ? 'AUTO REŽIM (PI)' : 'MANUÁLNY REŽIM';
             label.className = isAuto ? 'form-check-label fw-bold text-info' : 'form-check-label fw-bold text-warning';
 
             document.getElementById('rangeHeater').disabled = isAuto;
@@ -489,11 +489,11 @@
             addLog('>> BEZPEČNOSTNÝ STOP: Všetky akčné členy boli odpojené (0%)!');
         }
 
-        function sendPID() {
+        function sendPI() {
             const p = document.getElementById('inpKp').value;
             const i = document.getElementById('inpKi').value;
 
-            socket.emit('update_pid', { p: p, i: i, d: 0 });
+            socket.emit('update_pi', { p: p, i: i, d: 0 });
             addLog(`>> Aktualizácia PI: Kp=${p}, Ki=${i}`);
         }
     </script>

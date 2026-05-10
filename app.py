@@ -22,7 +22,7 @@ BAUD_RATE = 9600
 arduino = None
 
 last_data = {
-    "Ciel": 0, "Voda": 0, "Okolie": 0, "PID_PWM": 0, 
+    "Ciel": 0, "Voda": 0, "Vystup": 0, "PI_PWM": 0, 
     "Pumpa": 0, "Ohrev": 0, "PTerm": 0, "Mod": 0
 }
 
@@ -70,12 +70,12 @@ def handle_setting(data):
         arduino.write(cmd.encode())
         logging.info(f"Odoslaný príkaz nastavenia: {cmd.strip()}")
 
-@socketio.on('update_pid')
-def handle_pid(data):
+@socketio.on('update_pi')
+def handle_pi(data):
     if arduino and arduino.is_open:
         cmd = f"K{data['p']},{data['i']},{data['d']}\n"
         arduino.write(cmd.encode())
-        logging.info(f"Odoslaný príkaz ladenia PID: {cmd.strip()}")
+        logging.info(f"Odoslaný príkaz ladenia PI: {cmd.strip()}")
 
 if __name__ == '__main__':
     connect_arduino()
