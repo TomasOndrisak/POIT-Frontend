@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="sk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Igor Najšel, Matúš Matuška, Tomáš Ondrišák | POIT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --accent-cyan: #0ea5e9;
+            --accent-orange: #f97316;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-light);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .form-label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .form-control,
+        .form-range::-webkit-slider-thumb {
+            background-color: var(--accent-cyan);
+        }
+
+        .form-control {
+            background-color: #0f172a;
+            border: 1px solid var(--border-color);
+            color: var(--text-light);
+        }
+
+        .form-control:focus {
+            background-color: #0f172a;
+            color: var(--text-light);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 0.25rem rgba(14, 165, 233, 0.25);
+        }
+
+        .temp-display {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            font-size: 1.7rem;
+            font-weight: 700;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .val-cyan {
+            color: var(--accent-cyan);
+        }
+
+        .val-orange {
+            color: var(--accent-orange);
+        }
+
+        .val-white {
+            color: var(--text-light);
+        }
+
+        .unit {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-left: 3px;
+            align-self: flex-end;
+            margin-bottom: 2px;
+        }
+
+        .log-panel {
+            background-color: #000;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            color: #10b981;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            border-bottom: 1px solid #1e293b;
+            padding-bottom: 2px;
+        }
+
+        .log-time {
+            color: #64748b;
+            margin-right: 10px;
+        }
+
+        .log-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-panel::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        .log-panel::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        .btn-primary-custom {
+            background-color: var(--accent-cyan);
+            color: #fff;
+            border: none;
+            font-weight: 600;
+        }
+
+        .btn-primary-custom:hover {
+            background-color: #0284c7;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container py-4">
+        <header class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-3">
+            <div>
+                <h1 class="h4 mb-1 text-white fw-bold">POIT Riadiaci Systém</h1>
+                <div id="connection-status" class="text-warning fw-bold" style="font-size: 0.85rem;">Pripájanie...</div>
+            </div>
+            <div class="text-end">
+                <div id="current-time" class="h5 mb-2 text-white font-monospace">--:--:--</div>
+                <span id="mode-badge" class="badge bg-secondary">Režim: Čaká na dáta</span>
+            </div>
+        </header>
+
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card p-3">
+                    <h6 class="form-label mb-3">Teplotný Priebeh</h6>
+                    <canvas id="tempChart" style="min-height: 260px;"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card p-3">
+                    <h6 class="form-label mb-3">Analýza Akčného zásahu a PID Súčastí</h6>
+                    <canvas id="pwmChart" style="min-height: 260px;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-3">
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <div class="card text-center p-2 mb-0 h-100">
+                            <div class="stat-label mb-1">Výstup</div>
+                            <div id="val-voda" class="temp-display val-cyan">--.-<span class="unit">°C</span></div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card text-center p-2 mb-0 h-100">
+                            <div class="stat-label mb-1">Žiadaná hodnota</div>
+                            <div id="val-ciel" class="temp-display val-orange">--.-<span class="unit">°C</span></div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card text-center p-2 mb-0 h-100">
+                            <div class="stat-label mb-1">Vstup</div>
+                            <div id="val-okolie" class="temp-display val-white">--.-<span class="unit">°C</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card p-3">
+                    <h6 class="form-label text-white mb-3">Manuálne Riadenie</h6>
+
+                    <label class="form-label">Žiadaná Teplota (°C)</label>
+                    <div class="d-flex align-items-center mb-3">
+                        <input type="range" class="form-range flex-grow-1 me-3" id="rangeSetpoint" min="10" max="40"
+                            step="0.5" value="18.0" oninput="syncInputs('S', this.value)">
+                        <input type="number" class="form-control form-control-sm w-25 text-center" id="numSetpoint"
+                            min="10" max="40" step="0.5" value="18.0" oninput="syncInputs('S', this.value)">
+                    </div>
+
+                    <label class="form-label">Výkon Čerpadla (%)</label>
+                    <div class="d-flex align-items-center mb-3">
+                        <input type="range" class="form-range flex-grow-1 me-3" id="rangePump" min="0" max="100"
+                            value="25" oninput="syncInputs('P', this.value)">
+                        <input type="number" class="form-control form-control-sm w-25 text-center" id="numPump" min="0"
+                            max="100" value="25" oninput="syncInputs('P', this.value)">
+                    </div>
+
+                    <label class="form-label">Výkon Ohrevu (%)</label>
+                    <div class="d-flex align-items-center mb-3">
+                        <input type="range" class="form-range flex-grow-1 me-3" id="rangeHeater" min="0" max="100"
+                            value="50" oninput="syncInputs('H', this.value)">
+                        <input type="number" class="form-control form-control-sm w-25 text-center" id="numHeater"
+                            min="0" max="100" value="50" oninput="syncInputs('H', this.value)">
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary-custom flex-grow-1" onclick="sendControls()">Odoslať
+                            nastavenia</button>
+                        <button class="btn btn-danger fw-bold" style="min-width: 90px;" onclick="sendStop()">
+                            STOP</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3">
+                <div class="card p-3">
+                    <h6 class="form-label text-white mb-3">PID Ladenie (Peltier)</h6>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <label class="form-label">Kp (Prop)</label>
+                            <input type="number" id="inpKp" class="form-control text-center" step="0.1" value="2.0">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Ki (Integ)</label>
+                            <input type="number" id="inpKi" class="form-control text-center" step="0.1" value="5.0">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Kd (Deriv)</label>
+                            <input type="number" id="inpKd" class="form-control text-center" step="0.1" value="1.0">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary-custom w-100" onclick="sendPID()">Odoslať PID Parametre</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="form-label mb-2">Systémový Log Príkazov</div>
+                <div class="log-panel" id="command-log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        setInterval(() => {
+            document.getElementById('current-time').innerText = new Date().toLocaleTimeString('sk-SK');
+        }, 1000);
+
+        const socket = io();
+        const MAX_SAMPLES = 60;
+
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+        Chart.defaults.font.family = 'Inter';
+
+        const ctxTemp = document.getElementById('tempChart').getContext('2d');
+        const tempChart = new Chart(ctxTemp, {
+            type: 'line',
+            data: {
+                labels: [], datasets: [
+                    { label: 'Výstup (°C)', data: [], borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.1)', tension: 0.2, fill: true, pointRadius: 0 },
+                    { label: 'Žiadaná hodnota (°C)', data: [], borderColor: '#f97316', borderDash: [4, 4], borderWidth: 2, pointRadius: 0 }
+                ]
+            },
+            options: { responsive: true, animation: false, interaction: { mode: 'index', intersect: false }, scales: { y: { title: { display: true, text: 'Teplota [°C]' } } } }
+        });
+
+        const ctxPwm = document.getElementById('pwmChart').getContext('2d');
+        const pwmChart = new Chart(ctxPwm, {
+            type: 'line',
+            data: {
+                labels: [], datasets: [
+                    { label: 'Výstup (0-255)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.1, fill: true, pointRadius: 0, borderWidth: 2 },
+                    { label: 'P-Zložka', data: [], borderColor: '#f59e0b', borderWidth: 1, pointRadius: 0 },
+                    { label: 'I-Zložka', data: [], borderColor: '#8b5cf6', borderWidth: 1, pointRadius: 0 },
+                    { label: 'D-Zložka', data: [], borderColor: '#ec4899', borderWidth: 1, pointRadius: 0 }
+                ]
+            },
+            options: { responsive: true, animation: false, interaction: { mode: 'index', intersect: false }, scales: { y: { suggestedMin: -50, suggestedMax: 260 } } }
+        });
+
+        socket.on('connect', () => {
+            const el = document.getElementById('connection-status');
+            el.innerHTML = "🟢 Pripojené";
+            el.className = "text-success fw-bold";
+            addLog("SYSTÉM: Nadviazané spojenie so serverom.");
+        });
+
+        socket.on('disconnect', () => {
+            const el = document.getElementById('connection-status');
+            el.innerHTML = "🔴 Odpojené";
+            el.className = "text-danger fw-bold";
+            addLog("CHYBA: Strata spojenia so serverom!");
+        });
+
+        socket.on('serial_data', (data) => {
+            document.getElementById('val-voda').innerHTML = `${data.Voda.toFixed(1)}<span class="unit">°C</span>`;
+            document.getElementById('val-ciel').innerHTML = `${data.Ciel.toFixed(1)}<span class="unit">°C</span>`;
+            document.getElementById('val-okolie').innerHTML = `${data.Okolie.toFixed(1)}<span class="unit">°C</span>`;
+
+            const now = new Date().toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            tempChart.data.labels.push(now);
+            tempChart.data.datasets[0].data.push(data.Voda);
+            tempChart.data.datasets[1].data.push(data.Ciel);
+
+            const pTerm = data.PTerm;
+            const output = data.PID_PWM;
+            const iTerm = output - pTerm;
+            const dTerm = 0;
+
+            pwmChart.data.labels.push(now);
+            pwmChart.data.datasets[0].data.push(output);
+            pwmChart.data.datasets[1].data.push(pTerm);
+            pwmChart.data.datasets[2].data.push(iTerm);
+            pwmChart.data.datasets[3].data.push(dTerm);
+
+            if (tempChart.data.labels.length > MAX_SAMPLES) {
+                tempChart.data.labels.shift();
+                tempChart.data.datasets.forEach(ds => ds.data.shift());
+                pwmChart.data.labels.shift();
+                pwmChart.data.datasets.forEach(ds => ds.data.shift());
+            }
+
+            tempChart.update();
+            pwmChart.update();
+
+            const modeBadge = document.getElementById('mode-badge');
+            const mod = parseFloat(data.Mod);
+            if (mod === 1) {
+                modeBadge.className = 'badge bg-danger';
+                modeBadge.innerText = 'OHREV';
+            } else if (mod === 0) {
+                modeBadge.className = 'badge bg-info text-dark';
+                modeBadge.innerText = 'CHLADENIE';
+            } else {
+                modeBadge.className = 'badge bg-secondary';
+                modeBadge.innerText = `Režim: ${mod}`;
+            }
+        });
+
+        function addLog(message) {
+            const logBox = document.getElementById('command-log');
+            const time = new Date().toLocaleTimeString('sk-SK');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+
+            logBox.appendChild(entry);
+
+            if (logBox.children.length > 50) logBox.firstChild.remove();
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function syncInputs(type, val) {
+            let rangeId = type === 'S' ? 'rangeSetpoint' : (type === 'P' ? 'rangePump' : 'rangeHeater');
+            let numId = type === 'S' ? 'numSetpoint' : (type === 'P' ? 'numPump' : 'numHeater');
+            document.getElementById(rangeId).value = val;
+            document.getElementById(numId).value = val;
+        }
+
+        function sendControls() {
+            const s = document.getElementById('numSetpoint').value;
+            const pPct = parseFloat(document.getElementById('numPump').value);
+            const hPct = parseFloat(document.getElementById('numHeater').value);
+            const p = Math.round(pPct * 2.55);
+            const h = Math.round(hPct * 2.55);
+            socket.emit('update_setting', { type: 'S', value: s });
+            socket.emit('update_setting', { type: 'P', value: p });
+            socket.emit('update_setting', { type: 'H', value: h });
+            addLog(`>> Nastavené: Setpoint=${s}°C, Čerpadlo=${pPct}% (${p}/255), Ohrev=${hPct}% (${h}/255)`);
+        }
+
+        function sendStop() {
+            socket.emit('update_setting', { type: 'P', value: 0 });
+            socket.emit('update_setting', { type: 'H', value: 0 });
+            ['rangePump', 'numPump', 'rangeHeater', 'numHeater'].forEach(id =>
+                document.getElementById(id).value = 0
+            );
+            addLog('>> STOP: Čerpadlo=0, Ohrev=0 (všetky PWM vypnuté)');
+        }
+
+        function sendPID() {
+            const p = document.getElementById('inpKp').value;
+            const i = document.getElementById('inpKi').value;
+            const d = document.getElementById('inpKd').value;
+            socket.emit('update_pid', { p: p, i: i, d: d });
+            addLog(`>> Aktualizácia PID: Kp=${p}, Ki=${i}, Kd=${d}`);
+        }
+    </script>
+</body>
+
+</html>
